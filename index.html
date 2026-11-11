@@ -2023,7 +2023,7 @@
           }
 
           var cardStyle = 'border:1.5px solid ' + cardBorder + ';border-radius:10px;padding:12px 14px;margin-bottom:8px;background:' + cardBg + ';';
-          html += '<div style="' + cardStyle + '">';
+          html += '<div style="' + cardStyle + '" data-prod-dn="' + p.dn + '">';
 
           // ── Linha principal: checkboxes + infos + contratos ──
           html += '<div style="display:flex;align-items:center;gap:10px;">';
@@ -2579,6 +2579,31 @@
       document.getElementById('nfGcmNumero').focus();
     }
 
+    // Destaca o card da loja no painel do GCM: 'enviando' / 'ok' (amarelo, "NF Enviada") / 'erro' (volta ao normal)
+    function marcarCardNfEnviada(dn, estado) {
+      var card = document.querySelector('[data-prod-dn="' + dn + '"]');
+      if (!card) return;
+      if (!card.dataset.estiloOriginal) card.dataset.estiloOriginal = card.getAttribute('style');
+      var selo = card.querySelector('.selo-nf-gcm');
+      if (estado === 'erro') {
+        card.setAttribute('style', card.dataset.estiloOriginal);
+        if (selo) selo.remove();
+        return;
+      }
+      card.style.background  = '#fffbe6';
+      card.style.borderColor = '#f0c040';
+      if (!selo) {
+        selo = document.createElement('span');
+        selo.className = 'selo-nf-gcm';
+        selo.style.cssText = 'font-size:10px;font-weight:700;background:#f0c040;color:#7a5a00;border-radius:20px;padding:1px 8px;';
+        var linhaNome = card.querySelector('div[style*="flex-wrap:wrap"]');
+        if (linhaNome) linhaNome.appendChild(selo);
+      }
+      selo.innerHTML = estado === 'enviando' ? '<i class="fas fa-spinner fa-spin" style="margin-right:3px"></i>Enviando NF' : 'NF Enviada';
+      var botao = card.querySelector('.btn-nf-gcm');
+      if (botao && estado === 'ok') botao.innerHTML = '<i class="fas fa-paper-plane"></i>Reenviar NF';
+    }
+
     function fecharEnvioNfGcm() {
       document.getElementById('modalNfGcmOverlay').classList.remove('aberto');
     }
@@ -2595,6 +2620,7 @@
 
       var btn = document.getElementById('btnNfGcm');
       btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Enviando...';
+      marcarCardNfEnviada(p.dn, 'enviando'); // destaca o card na hora, sem esperar o servidor
       var reader = new FileReader();
       reader.onload = function(e) {
         chamarFuncao('painel-loja', {
@@ -2612,11 +2638,19 @@
           document.getElementById('modalManualConfirm').style.display = 'none';
           document.getElementById('modalManualSucesso').style.display  = '';
           document.getElementById('modalManualOverlay').style.display  = 'flex';
-          recarregarPainelGestao();
+          marcarCardNfEnviada(p.dn, 'ok');
         }, function(err) {
-          alert('Erro ao enviar: ' + (err.message || err)
-                + '\n\nSe o e-mail chegou mesmo assim, envie de novo para o envio ficar registrado no sistema.');
-          recarregarPainelGestao();
+          console.error('Envio de NF:', err);
+          var msg = String(err.message || err);
+          if (msg.indexOf('e-mail foi enviado') >= 0) {
+            // e-mail saiu; só o registro no sistema falhou: o card continua destacado
+            marcarCardNfEnviada(p.dn, 'ok');
+            fecharEnvioNfGcm();
+            alert('A NF foi enviada por e-mail, mas o sistema não conseguiu registrar o envio.\nAvise o administrador.');
+          } else {
+            marcarCardNfEnviada(p.dn, 'erro');
+            alert('Não foi possível enviar a NF. Confira a internet e tente de novo.\nSe continuar, avise o administrador.');
+          }
         }).then(function() {
           btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i>Enviar NF';
         });
