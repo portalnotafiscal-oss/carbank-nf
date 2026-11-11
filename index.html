@@ -767,14 +767,18 @@
         <input type="text" id="emailPrincipal">
         <label>E-mail CC Master:</label>
         <input type="text" id="emailCopia">
-        <div class="dropzone dropzone-small" style="padding:15px;position:relative;">
-          <i class="fas fa-file-csv" style="font-size:20px;display:block;margin-bottom:6px;color:var(--primary)"></i>
-          <span id="nomeCsv">Base de Lojas (CSV, separador ;)</span>
-          <input type="file" id="inputCsv" accept=".csv"
-            onchange="document.getElementById('nomeCsv').innerText=this.files[0].name">
-        </div>
         <div class="progress-container" id="pContMaster"><div class="progress-bar" id="pBarMaster"></div></div>
         <button onclick="salvarMaster()" id="btnMaster" style="background:var(--accent);color:var(--primary)">Salvar Configurações</button>
+      </div>
+
+      <div class="admin-section">
+        <div class="admin-section-title"><i class="fas fa-user-tie"></i> GCMs</div>
+        <p style="font-size:13px;color:#718096;margin-top:0;margin-bottom:12px;">
+          Inclua o GCM aqui. Ele recebe o acesso e cadastra as próprias lojas no painel dele.
+        </p>
+        <button onclick="abrirCadastroGcm()" style="background:#0d2d66;color:#fff;">
+          <i class="fas fa-plus" style="margin-right:8px"></i>Incluir novo GCM
+        </button>
       </div>
 
       <div class="admin-section">
@@ -909,8 +913,8 @@
         return chamarFuncao('painel-gestao', { action: 'retorno-zero', dn: dn, anomes: anomes, valor: valor })
           .then(function() { return 'ok'; });
       },
-      atualizarSistemaMaster: function(novoMes, emailPrincipal, emailCopia, csvConteudo) {
-        return chamarAdmin('config-salvar', { mesRef: novoMes, emailPrincipal: emailPrincipal, emailCopia: emailCopia, csvLojas: csvConteudo });
+      atualizarSistemaMaster: function(novoMes, emailPrincipal, emailCopia) {
+        return chamarAdmin('config-salvar', { mesRef: novoMes, emailPrincipal: emailPrincipal, emailCopia: emailCopia });
       },
       processarPlanilhaComissoes:  function(fileData) { return chamarAdmin('importar-comissoes',  { fileData: fileData }); },
       processarPlanilhaPagamentos: function(fileData) { return chamarAdmin('importar-pagamentos', { fileData: fileData }); },
@@ -1000,9 +1004,8 @@
 
     function resetarUI() {
       ['identificador','senhaLogin','novaSenha1','novaSenha2','trocaUsuario','trocaPerfil','trocaLinha','numeroNF','numeroNFBonus'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-      ['arquivoPdf','arquivoPdfBonus','inputCsv','inputComissoes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+      ['arquivoPdf','arquivoPdfBonus','inputComissoes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
       ['nomeArquivoCom','nomeArquivoBonus'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerText='Clique ou arraste o PDF'; });
-      document.getElementById('nomeCsv').innerText       = 'Base de Lojas (CSV, separador ;)';
       document.getElementById('nomePagamentos').innerText = 'Clique para selecionar o arquivo .xlsx';
       document.getElementById('nomeComissoes').innerText = 'Clique para selecionar o arquivo .xlsx';
 
@@ -1613,24 +1616,75 @@
       var mes = document.getElementById('inputMes').value;
       var p   = document.getElementById('emailPrincipal').value;
       var c   = document.getElementById('emailCopia').value;
-      var csv = document.getElementById('inputCsv').files[0];
       document.getElementById('btnMaster').disabled = true;
       document.getElementById('pContMaster').style.display = 'block';
       var pBar = document.getElementById('pBarMaster');
       var w = 0;
       var int = setInterval(function(){ if(w<90){ w+=2; pBar.style.width=w+'%'; } }, 30);
-      if (csv) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-          google.script.run.withSuccessHandler(function(m){ clearInterval(int); pBar.style.width='100%'; alert(m); resetarUI(); })
-          .withFailureHandler(function(err){ clearInterval(int); alert(err); document.getElementById('btnMaster').disabled=false; })
-          .atualizarSistemaMaster(mes, p, c, e.target.result);
-        };
-        reader.readAsText(csv);
-      } else {
-        google.script.run.withSuccessHandler(function(m){ clearInterval(int); pBar.style.width='100%'; alert(m); resetarUI(); })
-        .atualizarSistemaMaster(mes, p, c, null);
-      }
+      google.script.run.withSuccessHandler(function(m){ clearInterval(int); pBar.style.width='100%'; alert(m); resetarUI(); })
+        .withFailureHandler(function(err){ clearInterval(int); alert(err.message || err); document.getElementById('btnMaster').disabled=false; pBar.style.width='0%'; })
+        .atualizarSistemaMaster(mes, p, c);
+    }
+
+    // ==========================================
+    // ADMIN: INCLUIR NOVO GCM
+    // ==========================================
+    var _coordenadoresExistentes = [];
+
+    function abrirCadastroGcm() {
+      ['gcmNome','gcmEmail','gcmCoord','gcmSenhaCoord'].forEach(function(id){ document.getElementById(id).value = ''; });
+      document.getElementById('gcmSenha').value = gerarSenhaProvisoria();
+      document.getElementById('gcmBlocoSenhaCoord').style.display = 'none';
+      document.getElementById('modalGcmOverlay').classList.add('aberto');
+      document.getElementById('gcmNome').focus();
+      // carrega os coordenadores que já existem, para sugerir na digitação
+      chamarFuncao('painel-admin', { action: 'coordenadores-listar', senhaMestra: _sessao.senhaMestra }).then(function(r) {
+        _coordenadoresExistentes = r.coordenadores || [];
+        document.getElementById('listaCoordenadores').innerHTML =
+          _coordenadoresExistentes.map(function(e){ return '<option value="' + e + '">'; }).join('');
+        checarCoordenadorNovo();
+      }, function(){});
+    }
+
+    function fecharCadastroGcm() {
+      document.getElementById('modalGcmOverlay').classList.remove('aberto');
+    }
+
+    // coordenador que ainda não existe precisa de senha provisória própria
+    function checarCoordenadorNovo() {
+      var e = document.getElementById('gcmCoord').value.trim().toLowerCase();
+      var novo = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && _coordenadoresExistentes.indexOf(e) < 0;
+      var bloco = document.getElementById('gcmBlocoSenhaCoord');
+      if (novo && bloco.style.display === 'none') document.getElementById('gcmSenhaCoord').value = gerarSenhaProvisoria();
+      bloco.style.display = novo ? '' : 'none';
+    }
+
+    function cadastrarGcm() {
+      var d = {
+        nome: document.getElementById('gcmNome').value.trim(),
+        email: document.getElementById('gcmEmail').value.trim(),
+        senha: document.getElementById('gcmSenha').value.trim(),
+        emailCoordenador: document.getElementById('gcmCoord').value.trim(),
+        senhaCoordenador: document.getElementById('gcmBlocoSenhaCoord').style.display === 'none' ? '' : document.getElementById('gcmSenhaCoord').value.trim()
+      };
+      if (!d.nome) return alert('Informe o nome do GCM.');
+      if (!d.email) return alert('Informe o e-mail do GCM.');
+      if (d.senha.length < 4) return alert('A senha provisória precisa ter pelo menos 4 caracteres.');
+      if (!d.emailCoordenador) return alert('Informe o e-mail do coordenador.');
+
+      var btn = document.getElementById('btnCadGcm');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Cadastrando...';
+      chamarFuncao('painel-admin', Object.assign({ action: 'gcm-cadastrar', senhaMestra: _sessao.senhaMestra }, d)).then(function(r) {
+        fecharCadastroGcm();
+        var txt = r.mensagem + '\n\nPasse para o GCM:\nUsuário: ' + d.email.toLowerCase() + '\nSenha provisória: ' + d.senha;
+        if (r.coordenadorNovo) txt += '\n\nCoordenador novo (' + d.emailCoordenador.toLowerCase() + ')\nSenha provisória: ' + d.senhaCoordenador
+                                   + '\nO coordenador consegue entrar quando o GCM cadastrar a primeira loja.';
+        alert(txt);
+      }, function(err) {
+        alert(err.message || err);
+      }).then(function() {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i>Incluir GCM';
+      });
     }
 
     // ==========================================
@@ -1708,7 +1762,6 @@
         html += '<span class="prod-import-titulo"><i class="fas fa-store"></i>Lojas</span>';
         html += '<div class="gcm-card-acoes">';
         html += '<button onclick="abrirCadastroLoja(\'uma\')" class="prod-import-btn"><i class="fas fa-plus"></i>Nova loja</button>';
-        html += '<button onclick="abrirCadastroLoja(\'lote\')" class="prod-import-btn secundario"><i class="fas fa-file-excel"></i>Em lote</button>';
         html += '</div>';
         html += '</div>';
         html += '</div>';
@@ -2313,7 +2366,7 @@
     // CADASTRO DE LOJA PELO GCM (uma loja ou planilha em lote)
     // ==========================================
     function abrirCadastroLoja(aba) {
-      ['cadCnpj','cadNome','cadDn','cadEmail'].forEach(function(id){ document.getElementById(id).value = ''; });
+      ['cadCnpj','cadNome','cadDn'].forEach(function(id){ document.getElementById(id).value = ''; });
       document.getElementById('cadSenha').value = gerarSenhaProvisoria();
       document.getElementById('cadArquivo').value = '';
       document.getElementById('cadNomeArquivo').innerText = 'Selecionar planilha';
@@ -2366,8 +2419,7 @@
         cnpj: document.getElementById('cadCnpj').value,
         nome: document.getElementById('cadNome').value,
         dn: document.getElementById('cadDn').value,
-        senhaLoja: document.getElementById('cadSenha').value,
-        emailLoja: document.getElementById('cadEmail').value
+        senhaLoja: document.getElementById('cadSenha').value
       };
       if (loja.cnpj.replace(/\D/g, '').length < 11) return alert('Informe o CNPJ.');
       if (!loja.nome.trim()) return alert('Informe o nome da loja.');
@@ -2421,8 +2473,8 @@
     function baixarModeloLojas(btn) {
       function gerar() {
         var wb = XLSX.utils.book_new();
-        var ws = XLSX.utils.aoa_to_sheet([['CNPJ', 'NOME DA LOJA', 'DN', 'E-MAIL DA LOJA', 'SENHA PROVISÓRIA']]);
-        ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 10 }, { wch: 32 }, { wch: 18 }];
+        var ws = XLSX.utils.aoa_to_sheet([['CNPJ', 'NOME DA LOJA', 'DN', 'SENHA PROVISÓRIA']]);
+        ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 10 }, { wch: 18 }];
         XLSX.utils.book_append_sheet(wb, ws, 'Lojas');
         var inst = XLSX.utils.aoa_to_sheet([
           ['Como preencher'],
@@ -2430,7 +2482,6 @@
           ['• CNPJ: com ou sem pontos (ex: 05.331.398/0001-62 ou 05331398000162).'],
           ['• NOME DA LOJA e DN são obrigatórios. DN só com números.'],
           ['• SENHA PROVISÓRIA: obrigatória, mínimo 4 caracteres. A loja troca no primeiro acesso.'],
-          ['• E-MAIL DA LOJA: opcional.'],
           ['• As lojas entram na sua carteira. CNPJ ou DN que já existem no sistema não são alterados.']
         ]);
         inst['!cols'] = [{ wch: 95 }];
@@ -2617,6 +2668,32 @@
     }
 
   </script>
+  <!-- ===== MODAL INCLUIR GCM (ADMIN) ===== -->
+  <div id="modalGcmOverlay" class="cad-overlay" onclick="if(event.target===this) fecharCadastroGcm()">
+    <div class="cad-box">
+      <div class="cad-topo">
+        <div class="cad-titulo"><i class="fas fa-user-tie"></i>Incluir novo GCM</div>
+        <button class="cad-fechar" onclick="fecharCadastroGcm()" title="Fechar"><i class="fas fa-times"></i></button>
+      </div>
+      <label>Nome do GCM *</label>
+      <input type="text" id="gcmNome" placeholder="Nome completo">
+      <label>E-mail do GCM *</label>
+      <input type="text" id="gcmEmail" placeholder="nome@vwfs.com" autocomplete="off">
+      <label>Senha provisória do GCM *</label>
+      <input type="text" id="gcmSenha" placeholder="Mín. 4 caracteres">
+      <label>E-mail do coordenador *</label>
+      <input type="text" id="gcmCoord" list="listaCoordenadores" placeholder="Escolha ou digite" autocomplete="off" oninput="checarCoordenadorNovo()">
+      <datalist id="listaCoordenadores"></datalist>
+      <div id="gcmBlocoSenhaCoord" style="display:none;">
+        <label>Senha provisória do coordenador *</label>
+        <input type="text" id="gcmSenhaCoord" placeholder="Mín. 4 caracteres">
+        <p class="cad-dica"><i class="fas fa-info-circle"></i>Coordenador novo no sistema: ele usa essa senha no primeiro acesso.</p>
+      </div>
+      <p class="cad-dica"><i class="fas fa-info-circle"></i>O GCM entra com o e-mail e a senha provisória, cria a própria senha no primeiro acesso e cadastra as lojas dele.</p>
+      <button id="btnCadGcm" class="cad-btn" onclick="cadastrarGcm()"><i class="fas fa-check"></i>Incluir GCM</button>
+    </div>
+  </div>
+
   <!-- ===== MODAL CADASTRO DE LOJA (GCM) ===== -->
   <div id="modalLojaOverlay" class="cad-overlay" onclick="if(event.target===this) fecharCadastroLoja()">
     <div class="cad-box">
@@ -2639,8 +2716,6 @@
           <div><label>DN *</label><input type="text" id="cadDn" placeholder="Ex: 66726" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')"></div>
           <div><label>Senha provisória *</label><input type="text" id="cadSenha" placeholder="Mín. 4 caracteres"></div>
         </div>
-        <label>E-mail da loja</label>
-        <input type="text" id="cadEmail" placeholder="opcional">
         <p class="cad-dica"><i class="fas fa-info-circle"></i>A loja entra com o CNPJ e a senha provisória, e cria a própria senha no primeiro acesso.</p>
         <button id="btnCadUma" class="cad-btn" onclick="cadastrarUmaLoja()"><i class="fas fa-check"></i>Cadastrar loja</button>
       </div>
