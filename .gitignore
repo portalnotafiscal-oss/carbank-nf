@@ -1,0 +1,5 @@
+# SITE PÚBLICO: só o index.html vai para o GitHub.
+# Tudo o mais (código do Google com chaves, backups, servidor) fica de fora.
+/*
+!/index.html
+!/.gitignore
