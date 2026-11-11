@@ -132,6 +132,15 @@
     }
     .btn-enviada-manual:hover { border-color: #c9a800; color: #7a5a00; background: #fffbe6; }
 
+    /* Importar produção (painel do GCM) — barra compacta */
+    .prod-import-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; margin-bottom: 18px; border: 1.5px solid #e9d5ff; border-radius: 12px; background: #fff; }
+    .prod-import-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #6b21a8; display: flex; align-items: center; gap: 6px; margin-right: auto; }
+    .prod-import-arquivo { position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 220px; padding: 7px 12px; border: 1.5px dashed #d8b4fe; border-radius: 8px; font-size: 12px; color: #6b21a8; cursor: pointer; margin: 0; font-weight: 500; }
+    .prod-import-arquivo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .prod-import-arquivo:hover { background: #faf5ff; }
+    .prod-import-arquivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; margin: 0; padding: 0; }
+    .prod-import-btn { width: auto !important; margin: 0 !important; padding: 8px 16px !important; border-radius: 8px; background: #6b21a8 !important; color: #fff !important; font-size: 12px !important; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+
     /* Card Produção */
     .prod-card {
       border: 1.5px solid #e9d5ff; border-radius: 12px;
@@ -1648,20 +1657,14 @@
 
       // ── Importar produção (só GCM; substitui apenas a produção das lojas dele) ──
       if (res.tipo === 'gcm') {
-        html += '<div class="admin-section" style="margin-bottom:18px;">';
-        html += '<div class="admin-section-title" style="color:#6b21a8;"><i class="fas fa-chart-bar" style="color:#6b21a8;"></i> Importar Produção</div>';
-        html += '<p style="font-size:13px;color:#718096;margin-top:0;margin-bottom:14px;">'
-              + 'Importe a planilha de produção das suas lojas. O sistema separa o <strong>código DN</strong> da coluna <strong>DEALER</strong> '
-              + '(formato <em>12345-Nome da Loja</em>) e conta os contratos. Só as lojas da sua carteira são atualizadas. '
-              + 'A produção fica no sistema até o Mês de Referência mudar.</p>';
-        html += '<div class="dropzone dropzone-small" style="padding:15px;position:relative;">';
-        html += '<i class="fas fa-chart-bar" style="font-size:20px;display:block;margin-bottom:6px;color:#6b21a8"></i>';
-        html += '<span id="nomeProducao">Clique para selecionar o arquivo .xlsx</span>';
+        html += '<div class="prod-import-bar">';
+        html += '<span class="prod-import-titulo"><i class="fas fa-chart-bar"></i>Produção</span>';
+        html += '<label class="prod-import-arquivo" title="Planilha .xlsx com as colunas DEALER e GCM">';
+        html += '<i class="fas fa-paperclip"></i><span id="nomeProducao">Selecionar planilha</span>';
         html += '<input type="file" id="inputProducao" accept=".xlsx,.xls" onchange="document.getElementById(\'nomeProducao\').innerText=this.files[0].name">';
-        html += '</div>';
-        html += '<div class="progress-container" id="pContProducao"><div class="progress-bar" id="pBarProducao"></div></div>';
-        html += '<button onclick="uploadProducao()" id="btnProducao" style="background:#6b21a8;color:#fff;">'
-              + '<i class="fas fa-upload" style="margin-right:8px"></i>Importar Produção</button>';
+        html += '</label>';
+        html += '<button onclick="uploadProducao()" id="btnProducao" class="prod-import-btn"><i class="fas fa-upload"></i>Importar</button>';
+        html += '<div class="progress-container" id="pContProducao" style="flex-basis:100%;margin:0;"><div class="progress-bar" id="pBarProducao"></div></div>';
         html += '</div>';
       }
 
@@ -2229,7 +2232,7 @@
     // ==========================================
     function uploadProducao() {
       var file = document.getElementById('inputProducao').files[0];
-      if (!file) return alert('Selecione a planilha de produção (.xlsx)!');
+      if (!file) return alert('Selecione a planilha de produção (.xlsx) com as colunas DEALER e GCM.');
       document.getElementById('btnProducao').disabled = true;
       document.getElementById('pContProducao').style.display = 'block';
       var pBar = document.getElementById('pBarProducao');
