@@ -170,6 +170,14 @@
     .cad-passo span { width: 20px; height: 20px; border-radius: 50%; background: #0d2d66; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .cad-arquivo { display: flex !important; max-width: none !important; margin-top: 8px !important; justify-content: center; padding: 12px !important; color: #0d2d66 !important; border-color: #c7d6ee !important; }
     #cadResultado { margin-top: 12px; font-size: 12px; }
+    .cfg-mudanca { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; color: #2d3748; }
+    .cfg-mudanca > div:last-child { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; word-break: break-all; }
+    .cfg-mudanca i { color: #a0aec0; font-size: 11px; }
+    .cfg-rotulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #718096; margin-bottom: 4px; }
+    .cfg-de { color: #a0aec0; text-decoration: line-through; }
+    .cfg-alerta { background: #fff8f0; border: 1px solid #f5c9a0; color: #9a4a00; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.45; display: flex; gap: 8px; }
+    .cfg-alerta i { margin-top: 2px; }
+    #btnMaster:disabled { opacity: 0.5; cursor: not-allowed; }
     .cad-ok { background: #e8faf0; border: 1px solid #a8dfc0; color: #1a7a4a; border-radius: 8px; padding: 8px 12px; }
     .cad-erros { background: #fff8f0; border: 1px solid #f5c9a0; color: #9a4a00; border-radius: 8px; padding: 8px 12px; margin-top: 8px; max-height: 160px; overflow-y: auto; }
     .cad-erros div { padding: 2px 0; }
@@ -762,13 +770,16 @@
       <div class="admin-section">
         <div class="admin-section-title"><i class="fas fa-cog"></i> Configurações Gerais</div>
         <label>Mês de Referência (dd/MM/aaaa):</label>
-        <input type="text" id="inputMes" placeholder="Ex: 01/01/2026" maxlength="10" oninput="mascaraData(this)">
+        <input type="text" id="inputMes" placeholder="Carregando..." maxlength="10" oninput="mascaraData(this); checarMudancaConfig()">
         <label>E-mail Principal:</label>
-        <input type="text" id="emailPrincipal">
+        <input type="text" id="emailPrincipal" placeholder="Carregando..." oninput="checarMudancaConfig()">
         <label>E-mail CC Master:</label>
-        <input type="text" id="emailCopia">
+        <input type="text" id="emailCopia" placeholder="Carregando..." oninput="checarMudancaConfig()">
+        <p id="configAviso" style="font-size:12px;color:#a0aec0;margin:6px 0 0;">Valores atuais do sistema. Altere o que precisar e clique em Alterar.</p>
         <div class="progress-container" id="pContMaster"><div class="progress-bar" id="pBarMaster"></div></div>
-        <button onclick="salvarMaster()" id="btnMaster" style="background:var(--accent);color:var(--primary)">Salvar Configurações</button>
+        <button onclick="salvarMaster()" id="btnMaster" disabled style="background:var(--accent);color:var(--primary)">
+          <i class="fas fa-pen" style="margin-right:6px"></i>Alterar configurações
+        </button>
       </div>
 
       <div class="admin-section">
@@ -1154,6 +1165,7 @@
       document.getElementById('loginArea').classList.add('hidden');
       if (res.tipo === 'admin') {
         document.getElementById('adminArea').classList.remove('hidden');
+        carregarConfigAdmin();
       } else if (res.tipo === 'gcm' || res.tipo === 'coordenador') {
         document.querySelector('.card').style.maxWidth = '1100px';
         renderizarPainelGestao(res);
@@ -1615,18 +1627,95 @@
     // ==========================================
     // SALVAR MASTER
     // ==========================================
-    function salvarMaster() {
-      var mes = document.getElementById('inputMes').value;
-      var p   = document.getElementById('emailPrincipal').value;
-      var c   = document.getElementById('emailCopia').value;
+    // Configurações gerais: os campos mostram o que está no banco; só grava depois de confirmar.
+    var _configAtual = null;
+
+    function valoresConfigTela() {
+      return {
+        mes:   document.getElementById('inputMes').value.trim(),
+        email: document.getElementById('emailPrincipal').value.trim(),
+        copia: document.getElementById('emailCopia').value.trim()
+      };
+    }
+
+    function carregarConfigAdmin() {
+      _configAtual = null;
+      ['inputMes','emailPrincipal','emailCopia'].forEach(function(id){
+        var el = document.getElementById(id); el.value = ''; el.placeholder = 'Carregando...';
+      });
       document.getElementById('btnMaster').disabled = true;
-      document.getElementById('pContMaster').style.display = 'block';
-      var pBar = document.getElementById('pBarMaster');
-      var w = 0;
-      var int = setInterval(function(){ if(w<90){ w+=2; pBar.style.width=w+'%'; } }, 30);
-      google.script.run.withSuccessHandler(function(m){ clearInterval(int); pBar.style.width='100%'; alert(m); resetarUI(); })
-        .withFailureHandler(function(err){ clearInterval(int); alert(err.message || err); document.getElementById('btnMaster').disabled=false; pBar.style.width='0%'; })
-        .atualizarSistemaMaster(mes, p, c);
+      chamarFuncao('painel-admin', { action: 'config-ler', senhaMestra: _sessao.senhaMestra }).then(function(c) {
+        _configAtual = { mes: c.mesRef || '', email: c.emailPrincipal || '', copia: c.emailCopia || '' };
+        document.getElementById('inputMes').value       = _configAtual.mes;
+        document.getElementById('emailPrincipal').value = _configAtual.email;
+        document.getElementById('emailCopia').value     = _configAtual.copia;
+        document.getElementById('inputMes').placeholder       = 'Ex: 01/01/2026';
+        document.getElementById('emailPrincipal').placeholder = 'Não definido';
+        document.getElementById('emailCopia').placeholder     = 'Não definido';
+        checarMudancaConfig();
+      }, function(err) {
+        alert('Erro ao carregar as configurações: ' + (err.message || err));
+      });
+    }
+
+    function checarMudancaConfig() {
+      var btn = document.getElementById('btnMaster');
+      var aviso = document.getElementById('configAviso');
+      if (!_configAtual) { btn.disabled = true; return; }
+      var v = valoresConfigTela();
+      var mudou = v.mes !== _configAtual.mes || v.email !== _configAtual.email || v.copia !== _configAtual.copia;
+      btn.disabled = !mudou;
+      aviso.innerText = mudou ? 'Há alterações não salvas. Clique em Alterar para revisar e confirmar.'
+                              : 'Valores atuais do sistema. Altere o que precisar e clique em Alterar.';
+      aviso.style.color = mudou ? '#c05621' : '#a0aec0';
+    }
+
+    // abre a janela de confirmação mostrando o que vai mudar
+    function salvarMaster() {
+      var v = valoresConfigTela(), a = _configAtual;
+      if (!a) return;
+      if (v.mes && !/^\d{2}\/\d{2}\/\d{4}$/.test(v.mes)) return alert('Mês de referência inválido. Use dd/MM/aaaa (ex: 01/11/2026).');
+      if (!v.mes && a.mes) return alert('O mês de referência não pode ficar vazio.');
+      var emailOk = function(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); };
+      if (v.email && !emailOk(v.email)) return alert('E-mail principal inválido.');
+      if (v.copia && !emailOk(v.copia)) return alert('E-mail CC inválido.');
+      if (!v.email && a.email) return alert('O e-mail principal não pode ficar vazio.');
+      if (!v.copia && a.copia) return alert('Para tirar o e-mail CC, me peça: por enquanto ele só pode ser trocado, não apagado.');
+
+      var esc = function(s) { return (s || '—').replace(/</g, '&lt;'); };
+      var html = '';
+      function linha(rotulo, de, para) {
+        if (de === para) return;
+        html += '<div class="cfg-mudanca"><div class="cfg-rotulo">' + rotulo + '</div>'
+              + '<div><span class="cfg-de">' + esc(de) + '</span><i class="fas fa-arrow-right"></i><strong>' + esc(para) + '</strong></div></div>';
+      }
+      linha('Mês de referência', a.mes, v.mes);
+      linha('E-mail principal', a.email, v.email);
+      linha('E-mail CC Master', a.copia, v.copia);
+      if (v.mes !== a.mes) {
+        html += '<div class="cfg-alerta"><i class="fas fa-exclamation-triangle"></i>Ao mudar o mês, o status de envio das NFs e a produção de todos os GCMs são zerados. Não dá para desfazer.</div>';
+      }
+      document.getElementById('cfgMudancas').innerHTML = html;
+      document.getElementById('modalConfigOverlay').classList.add('aberto');
+    }
+
+    function fecharConfirmConfig() {
+      document.getElementById('modalConfigOverlay').classList.remove('aberto');
+    }
+
+    function confirmarConfig() {
+      var v = valoresConfigTela();
+      var btn = document.getElementById('btnConfirmarConfig');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Gravando...';
+      chamarAdmin('config-salvar', { mesRef: v.mes, emailPrincipal: v.email, emailCopia: v.copia }).then(function(msg) {
+        fecharConfirmConfig();
+        alert(msg);
+        carregarConfigAdmin(); // mostra o que ficou gravado no banco
+      }, function(err) {
+        alert('Erro: ' + (err.message || err));
+      }).then(function() {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i>Confirmar';
+      });
     }
 
     // ==========================================
@@ -2752,6 +2841,21 @@
     }
 
   </script>
+  <!-- ===== MODAL CONFIRMAR CONFIGURAÇÕES (ADMIN) ===== -->
+  <div id="modalConfigOverlay" class="cad-overlay" onclick="if(event.target===this) fecharConfirmConfig()">
+    <div class="cad-box" style="max-width:400px;">
+      <div class="cad-topo">
+        <div class="cad-titulo"><i class="fas fa-cog"></i>Confirmar alterações</div>
+        <button class="cad-fechar" onclick="fecharConfirmConfig()" title="Fechar"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="cfgMudancas"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="cad-btn claro" onclick="fecharConfirmConfig()" style="margin-top:14px !important;">Cancelar</button>
+        <button id="btnConfirmarConfig" class="cad-btn" onclick="confirmarConfig()"><i class="fas fa-check"></i>Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL INCLUIR GCM (ADMIN) ===== -->
   <div id="modalGcmOverlay" class="cad-overlay" onclick="if(event.target===this) fecharCadastroGcm()">
     <div class="cad-box">
