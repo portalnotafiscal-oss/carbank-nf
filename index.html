@@ -2614,7 +2614,9 @@
           document.getElementById('modalManualOverlay').style.display  = 'flex';
           recarregarPainelGestao();
         }, function(err) {
-          alert('Erro ao enviar: ' + (err.message || err));
+          alert('Erro ao enviar: ' + (err.message || err)
+                + '\n\nSe o e-mail chegou mesmo assim, envie de novo para o envio ficar registrado no sistema.');
+          recarregarPainelGestao();
         }).then(function() {
           btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i>Enviar NF';
         });
