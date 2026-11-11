@@ -2217,25 +2217,97 @@
     // ==========================================
     // UPLOAD DE PAGAMENTOS
     // ==========================================
+    // Pagamentos: a planilha tem ~100 mil linhas e não cabe no servidor.
+    // O navegador lê o .xlsx, guarda só as linhas do mês seguinte ao de referência (col L)
+    // e manda em pacotes de 2000 linhas. O servidor confere de novo e grava.
     function uploadPagamentos() {
       var file = document.getElementById('inputPagamentos').files[0];
       if (!file) return alert('Selecione a planilha de pagamentos (.xlsx)!');
-      document.getElementById('btnPagamentos').disabled = true;
-      document.getElementById('pContPagamentos').style.display = 'block';
+      var btn  = document.getElementById('btnPagamentos');
       var pBar = document.getElementById('pBarPagamentos');
-      var w = 0;
-      var int = setInterval(function(){ if(w<85){ w++; pBar.style.width=w+'%'; } }, 60);
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        google.script.run
-          .withSuccessHandler(function(msg){
-            clearInterval(int); pBar.style.width='100%';
-            setTimeout(function(){ alert(msg); document.getElementById('btnPagamentos').disabled=false; pBar.style.width='0%'; document.getElementById('pContPagamentos').style.display='none'; }, 300);
-          })
-          .withFailureHandler(function(err){ clearInterval(int); alert('Erro: '+err); document.getElementById('btnPagamentos').disabled=false; })
-          .processarPlanilhaPagamentos({ data: e.target.result, name: file.name, type: file.type });
-      };
-      reader.readAsDataURL(file);
+      btn.disabled = true;
+      document.getElementById('pContPagamentos').style.display = 'block';
+      function progresso(p, texto) { pBar.style.width = p + '%'; pBar.innerText = texto || ''; }
+      progresso(3, 'Lendo planilha...');
+
+      var mesRefIso, mesSeguinte;
+      chamarFuncao('painel-admin', { action: 'config-ler', senhaMestra: _sessao.senhaMestra }).then(function(c) {
+        var m = (c.mesRef || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (!m) throw new Error('Mês de referência não definido. Salve as Configurações Gerais primeiro.');
+        mesRefIso = m[3] + '-' + m[2] + '-' + m[1];
+        var mes = parseInt(m[2], 10), ano = parseInt(m[3], 10);
+        mesSeguinte = mes === 12 ? { m: 1, a: ano + 1 } : { m: mes + 1, a: ano };
+        return Promise.all([carregarSheetJS(), file.arrayBuffer()]);
+      }).then(function(r) {
+        // deixa a barra aparecer antes de travar o navegador lendo o arquivo
+        return new Promise(function(ok) { setTimeout(function() { ok(r[1]); }, 50); });
+      }).then(function(buf) {
+        var wb = XLSX.read(new Uint8Array(buf), { type: 'array', dense: true });
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+        if (rows.length < 2) throw new Error('Planilha de pagamentos vazia ou sem dados.');
+        var cab = rows[0], lidas = 0, doMes = [];
+        for (var i = 1; i < rows.length; i++) {
+          var d = dataIsoPlanilha(rows[i][11]);  // col L = data do pagamento
+          if (!d) continue;
+          lidas++;
+          if (+d.slice(5, 7) === mesSeguinte.m && +d.slice(0, 4) === mesSeguinte.a) doMes.push(rows[i]);
+        }
+        rows = null;
+        progresso(15, 'Enviando...');
+
+        var pacotes = [];
+        for (var p = 0; p < doMes.length; p += 2000) pacotes.push(doMes.slice(p, p + 2000));
+        if (!pacotes.length) pacotes.push([]); // nenhuma linha do mês: só limpa a tabela, como antes
+        var gravadas = 0;
+        return pacotes.reduce(function(fila, pacote, idx) {
+          return fila.then(function() {
+            return chamarFuncao('painel-admin', {
+              action: 'importar-pagamentos-lote', senhaMestra: _sessao.senhaMestra,
+              cabecalho: cab, linhas: pacote, limpar: idx === 0
+            }).then(function(res) {
+              gravadas += res.gravadas;
+              progresso(15 + Math.round(85 * (idx + 1) / pacotes.length), (idx + 1) + '/' + pacotes.length);
+            });
+          });
+        }, Promise.resolve()).then(function() {
+          var label = ('0' + mesSeguinte.m).slice(-2) + '/' + mesSeguinte.a;
+          var ref   = mesRefIso.slice(8, 10) + '/' + mesRefIso.slice(5, 7) + '/' + mesRefIso.slice(0, 4);
+          return 'Pagamentos importados! ' + gravadas + ' registros de ' + label + ' gravados com referência ' + ref
+               + '. (' + (lidas - doMes.length) + ' linhas de outros meses excluídas.)';
+        });
+      }).then(function(msg) {
+        progresso(100, '');
+        setTimeout(function() { alert(msg); }, 200);
+      }, function(err) {
+        alert('Erro ao importar pagamentos: ' + (err.message || err)
+              + '\n\nSe parte dos pagamentos já tinha sido gravada, importe a planilha de novo.');
+      }).then(function() {
+        setTimeout(function() {
+          btn.disabled = false; progresso(0, '');
+          document.getElementById('pContPagamentos').style.display = 'none';
+        }, 250);
+      });
+    }
+
+    // mesma regra do servidor: número de data do Excel, dd/mm/aaaa ou aaaa-mm-dd -> "aaaa-mm-dd"
+    function dataIsoPlanilha(v) {
+      if (typeof v === 'number' && v > 20000) return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
+      var s = String(v == null ? '' : v).trim(), m;
+      if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+      if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+      return '';
+    }
+
+    // biblioteca SheetJS (lê e gera .xlsx no navegador), carregada só quando precisa
+    function carregarSheetJS() {
+      if (window.XLSX) return Promise.resolve();
+      return new Promise(function(ok, falha) {
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = ok;
+        s.onerror = function() { falha(new Error('Não foi possível carregar o leitor de planilhas. Verifique a internet.')); };
+        document.head.appendChild(s);
+      });
     }
     function corrigirDNs() {
       var btn = document.getElementById('btnCorrigirDN');
@@ -2506,11 +2578,8 @@
       if (window.XLSX) return gerar();
       var original = btn.innerHTML;
       btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Preparando...';
-      var s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload  = function(){ btn.disabled = false; btn.innerHTML = original; gerar(); };
-      s.onerror = function(){ btn.disabled = false; btn.innerHTML = original; alert('Não foi possível gerar a planilha. Verifique a internet e tente de novo.'); };
-      document.head.appendChild(s);
+      carregarSheetJS().then(gerar, function(err) { alert(err.message); })
+        .then(function() { btn.disabled = false; btn.innerHTML = original; });
     }
 
     function copiarCnpj(cnpj, btn) {
