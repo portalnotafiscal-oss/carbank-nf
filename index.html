@@ -774,22 +774,9 @@
         </button>
       </div>
 
-      <div class="admin-section">
-        <div class="admin-section-title" style="color:#6b21a8;"><i class="fas fa-chart-bar" style="color:#6b21a8;"></i> Produção</div>
-        <p style="font-size:13px;color:#718096;margin-top:0;margin-bottom:14px;">
-          Importe a planilha de produção. O sistema separa o <strong>código DN</strong> da coluna <strong>E</strong> (formato <em>12345-Nome da Loja</em>) e soma os contratos da coluna <strong>B</strong>. O mês de referência é lido da aba Config.
-        </p>
-        <div class="dropzone dropzone-small" style="padding:15px;position:relative;">
-          <i class="fas fa-chart-bar" style="font-size:20px;display:block;margin-bottom:6px;color:#6b21a8"></i>
-          <span id="nomeProducao">Clique para selecionar o arquivo .xlsx</span>
-          <input type="file" id="inputProducao" accept=".xlsx,.xls"
-            onchange="document.getElementById('nomeProducao').innerText=this.files[0].name">
-        </div>
-        <div class="progress-container" id="pContProducao"><div class="progress-bar" id="pBarProducao"></div></div>
-        <button onclick="uploadProducao()" id="btnProducao" style="background:#6b21a8;color:#fff;">
-          <i class="fas fa-upload" style="margin-right:8px"></i>Importar Produção
-        </button>
-      </div>
+      <p style="font-size:12px;color:#718096;margin:4px 0 14px;">
+        <i class="fas fa-info-circle" style="margin-right:4px;"></i>A produção agora é importada por cada GCM, no painel dele. Ao mudar o Mês de Referência, a produção de todos é apagada.
+      </p>
       <button class="btn-voltar" onclick="resetarUI()">Sair</button>
     </div>
 
@@ -885,7 +872,12 @@
       },
       processarPlanilhaComissoes:  function(fileData) { return chamarAdmin('importar-comissoes',  { fileData: fileData }); },
       processarPlanilhaPagamentos: function(fileData) { return chamarAdmin('importar-pagamentos', { fileData: fileData }); },
-      processarPlanilhaProducao:   function(fileData) { return chamarAdmin('importar-producao',   { fileData: fileData }); },
+      // produção: cada GCM importa a das suas lojas (servidor confere e-mail e senha do GCM)
+      processarPlanilhaProducaoGcm: function(fileData) {
+        return chamarFuncao('painel-gestao', {
+          action: 'importar-producao', email: _sessao.usuario, senha: _sessao.senha, fileData: fileData
+        }).then(function(r) { return r.mensagem; });
+      },
       corrigirDNsPagamentos:       function()         { return chamarAdmin('corrigir-dns'); }
     };
 
@@ -1654,6 +1646,25 @@
       html += '<span class="gestao-email-badge">' + tipo + ' &mdash; ' + res.email + '</span>';
       html += '</div>';
 
+      // ── Importar produção (só GCM; substitui apenas a produção das lojas dele) ──
+      if (res.tipo === 'gcm') {
+        html += '<div class="admin-section" style="margin-bottom:18px;">';
+        html += '<div class="admin-section-title" style="color:#6b21a8;"><i class="fas fa-chart-bar" style="color:#6b21a8;"></i> Importar Produção</div>';
+        html += '<p style="font-size:13px;color:#718096;margin-top:0;margin-bottom:14px;">'
+              + 'Importe a planilha de produção das suas lojas. O sistema separa o <strong>código DN</strong> da coluna <strong>DEALER</strong> '
+              + '(formato <em>12345-Nome da Loja</em>) e conta os contratos. Só as lojas da sua carteira são atualizadas. '
+              + 'A produção fica no sistema até o Mês de Referência mudar.</p>';
+        html += '<div class="dropzone dropzone-small" style="padding:15px;position:relative;">';
+        html += '<i class="fas fa-chart-bar" style="font-size:20px;display:block;margin-bottom:6px;color:#6b21a8"></i>';
+        html += '<span id="nomeProducao">Clique para selecionar o arquivo .xlsx</span>';
+        html += '<input type="file" id="inputProducao" accept=".xlsx,.xls" onchange="document.getElementById(\'nomeProducao\').innerText=this.files[0].name">';
+        html += '</div>';
+        html += '<div class="progress-container" id="pContProducao"><div class="progress-bar" id="pBarProducao"></div></div>';
+        html += '<button onclick="uploadProducao()" id="btnProducao" style="background:#6b21a8;color:#fff;">'
+              + '<i class="fas fa-upload" style="margin-right:8px"></i>Importar Produção</button>';
+        html += '</div>';
+      }
+
       // Resumo (OCULTO)
       html += '<div class="gestao-resumo" style="display:none;">';
       html += '<div class="resumo-item"><span class="r-label">Lojas</span><span class="r-val">' + totalLojas + '</span></div>';
@@ -2231,11 +2242,10 @@
             clearInterval(int); pBar.style.width='100%';
             setTimeout(function(){
               alert(msg);
-              document.getElementById('btnProducao').disabled = false;
-              pBar.style.width='0%';
-              document.getElementById('pContProducao').style.display='none';
-              document.getElementById('nomeProducao').innerText='Clique para selecionar o arquivo .xlsx';
-              document.getElementById('inputProducao').value='';
+              // recarrega o painel para mostrar a produção nova
+              google.script.run
+                .withSuccessHandler(function(res){ renderizarPainelGestao(res); })
+                .verificarLogin(_sessao.usuario, _sessao.senha);
             }, 300);
           })
           .withFailureHandler(function(err){
@@ -2243,7 +2253,7 @@
             alert('Erro ao importar produção: ' + (err.message || err));
             document.getElementById('btnProducao').disabled = false;
           })
-          .processarPlanilhaProducao({ data: e.target.result, name: file.name, type: file.type });
+          .processarPlanilhaProducaoGcm({ data: e.target.result, name: file.name, type: file.type });
       };
       reader.readAsDataURL(file);
     }
