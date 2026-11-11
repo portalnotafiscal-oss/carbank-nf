@@ -133,13 +133,46 @@
     .btn-enviada-manual:hover { border-color: #c9a800; color: #7a5a00; background: #fffbe6; }
 
     /* Importar produção (painel do GCM) — barra compacta */
-    .prod-import-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; margin-bottom: 18px; border: 1.5px solid #e9d5ff; border-radius: 12px; background: #fff; }
+    .gcm-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    @media (max-width: 700px) { .gcm-cards { grid-template-columns: 1fr; } }
+    .gcm-card-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .prod-import-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border: 1.5px solid #e9d5ff; border-radius: 12px; background: #fff; }
+    .prod-import-bar.lojas { border-color: #c7d6ee; }
+    .prod-import-bar.lojas .prod-import-titulo { color: #0d2d66; }
+    .prod-import-bar.lojas .prod-import-btn { background: #0d2d66 !important; }
+    .prod-import-bar.lojas .prod-import-btn.secundario { background: #fff !important; color: #0d2d66 !important; border: 1.5px solid #c7d6ee; }
     .prod-import-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #6b21a8; display: flex; align-items: center; gap: 6px; margin-right: auto; }
     .prod-import-arquivo { position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 220px; padding: 7px 12px; border: 1.5px dashed #d8b4fe; border-radius: 8px; font-size: 12px; color: #6b21a8; cursor: pointer; margin: 0; font-weight: 500; }
     .prod-import-arquivo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .prod-import-arquivo:hover { background: #faf5ff; }
     .prod-import-arquivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; margin: 0; padding: 0; }
     .prod-import-btn { width: auto !important; margin: 0 !important; padding: 8px 16px !important; border-radius: 8px; background: #6b21a8 !important; color: #fff !important; font-size: 12px !important; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+
+    /* Modal de cadastro de loja (GCM) */
+    .cad-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9000; align-items: center; justify-content: center; padding: 16px; }
+    .cad-overlay.aberto { display: flex; }
+    .cad-box { background: #fff; border-radius: 16px; padding: 22px 22px 20px; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); box-sizing: border-box; }
+    .cad-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cad-titulo { font-size: 15px; font-weight: 700; color: #0d2d66; display: flex; align-items: center; gap: 8px; }
+    .cad-fechar { width: auto !important; margin: 0 !important; padding: 4px 8px !important; background: none !important; color: #a0aec0 !important; font-size: 16px; }
+    .cad-abas { display: flex; gap: 4px; background: #f1f4f9; border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+    .cad-abas button { flex: 1; margin: 0 !important; padding: 8px !important; border-radius: 8px; background: transparent !important; color: #4a5568 !important; font-size: 12px !important; font-weight: 600; }
+    .cad-abas button.ativa { background: #fff !important; color: #0d2d66 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .cad-box label { display: block; font-size: 12px; font-weight: 600; color: #4a5568; margin: 10px 0 4px; }
+    .cad-box input[type=text] { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1.5px solid #d0d7e4; border-radius: 8px; font-size: 13px; margin: 0; }
+    .cad-box input[type=text]:focus { border-color: #0d2d66; outline: none; }
+    .cad-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .cad-dica { font-size: 11px; color: #718096; margin: 12px 0 0; display: flex; gap: 6px; line-height: 1.4; }
+    .cad-dica i { color: #3a86d4; margin-top: 2px; }
+    .cad-btn { width: 100%; margin: 14px 0 0 !important; padding: 11px !important; border-radius: 10px; background: #0d2d66 !important; color: #fff !important; font-size: 13px !important; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .cad-btn.claro { background: #fff !important; color: #0d2d66 !important; border: 1.5px solid #c7d6ee !important; margin-top: 8px !important; }
+    .cad-passo { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #4a5568; margin-top: 12px; }
+    .cad-passo span { width: 20px; height: 20px; border-radius: 50%; background: #0d2d66; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cad-arquivo { display: flex !important; max-width: none !important; margin-top: 8px !important; justify-content: center; padding: 12px !important; color: #0d2d66 !important; border-color: #c7d6ee !important; }
+    #cadResultado { margin-top: 12px; font-size: 12px; }
+    .cad-ok { background: #e8faf0; border: 1px solid #a8dfc0; color: #1a7a4a; border-radius: 8px; padding: 8px 12px; }
+    .cad-erros { background: #fff8f0; border: 1px solid #f5c9a0; color: #9a4a00; border-radius: 8px; padding: 8px 12px; margin-top: 8px; max-height: 160px; overflow-y: auto; }
+    .cad-erros div { padding: 2px 0; }
 
     /* Card Produção */
     .prod-card {
@@ -1657,14 +1690,27 @@
 
       // ── Importar produção (só GCM; substitui apenas a produção das lojas dele) ──
       if (res.tipo === 'gcm') {
+        html += '<div class="gcm-cards">';
+        // Card 1: importar produção
         html += '<div class="prod-import-bar">';
         html += '<span class="prod-import-titulo"><i class="fas fa-chart-bar"></i>Produção</span>';
+        html += '<div class="gcm-card-acoes">';
         html += '<label class="prod-import-arquivo" title="Planilha .xlsx com as colunas DEALER e GCM">';
         html += '<i class="fas fa-paperclip"></i><span id="nomeProducao">Selecionar planilha</span>';
         html += '<input type="file" id="inputProducao" accept=".xlsx,.xls" onchange="document.getElementById(\'nomeProducao\').innerText=this.files[0].name">';
         html += '</label>';
         html += '<button onclick="uploadProducao()" id="btnProducao" class="prod-import-btn"><i class="fas fa-upload"></i>Importar</button>';
+        html += '</div>';
         html += '<div class="progress-container" id="pContProducao" style="flex-basis:100%;margin:0;"><div class="progress-bar" id="pBarProducao"></div></div>';
+        html += '</div>';
+        // Card 2: cadastrar lojas
+        html += '<div class="prod-import-bar lojas">';
+        html += '<span class="prod-import-titulo"><i class="fas fa-store"></i>Lojas</span>';
+        html += '<div class="gcm-card-acoes">';
+        html += '<button onclick="abrirCadastroLoja(\'uma\')" class="prod-import-btn"><i class="fas fa-plus"></i>Nova loja</button>';
+        html += '<button onclick="abrirCadastroLoja(\'lote\')" class="prod-import-btn secundario"><i class="fas fa-file-excel"></i>Em lote</button>';
+        html += '</div>';
+        html += '</div>';
         html += '</div>';
       }
 
@@ -2263,6 +2309,144 @@
 
     // ==========================================
     // ==========================================
+    // ==========================================
+    // CADASTRO DE LOJA PELO GCM (uma loja ou planilha em lote)
+    // ==========================================
+    function abrirCadastroLoja(aba) {
+      ['cadCnpj','cadNome','cadDn','cadEmail'].forEach(function(id){ document.getElementById(id).value = ''; });
+      document.getElementById('cadSenha').value = gerarSenhaProvisoria();
+      document.getElementById('cadArquivo').value = '';
+      document.getElementById('cadNomeArquivo').innerText = 'Selecionar planilha';
+      document.getElementById('cadResultado').innerHTML = '';
+      trocarAbaCadastro(aba);
+      document.getElementById('modalLojaOverlay').classList.add('aberto');
+      if (aba === 'uma') document.getElementById('cadCnpj').focus();
+    }
+
+    function fecharCadastroLoja() {
+      document.getElementById('modalLojaOverlay').classList.remove('aberto');
+    }
+
+    function trocarAbaCadastro(aba) {
+      document.getElementById('cadPainelUma').style.display  = aba === 'uma'  ? '' : 'none';
+      document.getElementById('cadPainelLote').style.display = aba === 'lote' ? '' : 'none';
+      document.getElementById('cadAbaUma').classList.toggle('ativa',  aba === 'uma');
+      document.getElementById('cadAbaLote').classList.toggle('ativa', aba === 'lote');
+    }
+
+    // senha provisória sugerida (sem letras/números que confundem: 0/O, 1/l/I)
+    function gerarSenhaProvisoria() {
+      var c = 'abcdefghjkmnpqrstuvwxyz23456789', s = '';
+      for (var i = 0; i < 6; i++) s += c.charAt(Math.floor(Math.random() * c.length));
+      return s;
+    }
+
+    function mascaraCnpj(el) {
+      var v = el.value.replace(/\D/g, '').slice(0, 14);
+      v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+           .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+      el.value = v;
+    }
+
+    function chamarCadastroLojas(extra) {
+      return chamarFuncao('painel-gestao', Object.assign({
+        action: 'cadastrar-lojas', email: _sessao.usuario, senha: _sessao.senha
+      }, extra));
+    }
+
+    // recarrega o painel do GCM depois de cadastrar
+    function recarregarPainelGestao() {
+      google.script.run
+        .withSuccessHandler(function(res){ renderizarPainelGestao(res); })
+        .verificarLogin(_sessao.usuario, _sessao.senha);
+    }
+
+    function cadastrarUmaLoja() {
+      var loja = {
+        cnpj: document.getElementById('cadCnpj').value,
+        nome: document.getElementById('cadNome').value,
+        dn: document.getElementById('cadDn').value,
+        senhaLoja: document.getElementById('cadSenha').value,
+        emailLoja: document.getElementById('cadEmail').value
+      };
+      if (loja.cnpj.replace(/\D/g, '').length < 11) return alert('Informe o CNPJ.');
+      if (!loja.nome.trim()) return alert('Informe o nome da loja.');
+      if (!loja.dn.trim())   return alert('Informe o DN.');
+      if (loja.senhaLoja.trim().length < 4) return alert('A senha provisória precisa ter pelo menos 4 caracteres.');
+
+      var btn = document.getElementById('btnCadUma');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Cadastrando...';
+      chamarCadastroLojas({ lojas: [loja] }).then(function() {
+        fecharCadastroLoja();
+        alert('Loja cadastrada!\n\nPasse para a loja:\nUsuário (CNPJ): ' + document.getElementById('cadCnpj').value
+              + '\nSenha provisória: ' + loja.senhaLoja);
+        recarregarPainelGestao();
+      }, function(err) {
+        alert(err.message || err);
+      }).then(function() {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i>Cadastrar loja';
+      });
+    }
+
+    function cadastrarLojasLote() {
+      var file = document.getElementById('cadArquivo').files[0];
+      if (!file) return alert('Selecione a planilha preenchida (.xlsx).');
+      var btn = document.getElementById('btnCadLote');
+      var res = document.getElementById('cadResultado');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Cadastrando...';
+      res.innerHTML = '';
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        chamarCadastroLojas({ fileData: { data: e.target.result, name: file.name, type: file.type } }).then(function(r) {
+          var html = '<div class="cad-ok"><i class="fas fa-check-circle" style="margin-right:6px"></i>' + r.mensagem + '</div>';
+          if (r.erros && r.erros.length) {
+            html += '<div class="cad-erros"><strong>Não cadastradas:</strong>';
+            r.erros.forEach(function(m){ html += '<div>• ' + m.replace(/</g, '&lt;') + '</div>'; });
+            html += '</div>';
+          }
+          res.innerHTML = html;
+          document.getElementById('cadArquivo').value = '';
+          document.getElementById('cadNomeArquivo').innerText = 'Selecionar planilha';
+          if (r.cadastradas) recarregarPainelGestao();
+        }, function(err) {
+          res.innerHTML = '<div class="cad-erros">' + (err.message || err) + '</div>';
+        }).then(function() {
+          btn.disabled = false; btn.innerHTML = '<i class="fas fa-upload"></i>Cadastrar lojas';
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Gera a planilha modelo .xlsx no próprio navegador (biblioteca SheetJS carregada só quando precisa)
+    function baixarModeloLojas(btn) {
+      function gerar() {
+        var wb = XLSX.utils.book_new();
+        var ws = XLSX.utils.aoa_to_sheet([['CNPJ', 'NOME DA LOJA', 'DN', 'E-MAIL DA LOJA', 'SENHA PROVISÓRIA']]);
+        ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 10 }, { wch: 32 }, { wch: 18 }];
+        XLSX.utils.book_append_sheet(wb, ws, 'Lojas');
+        var inst = XLSX.utils.aoa_to_sheet([
+          ['Como preencher'],
+          ['• Uma loja por linha, a partir da linha 2 da aba "Lojas". Não mude os títulos da linha 1.'],
+          ['• CNPJ: com ou sem pontos (ex: 05.331.398/0001-62 ou 05331398000162).'],
+          ['• NOME DA LOJA e DN são obrigatórios. DN só com números.'],
+          ['• SENHA PROVISÓRIA: obrigatória, mínimo 4 caracteres. A loja troca no primeiro acesso.'],
+          ['• E-MAIL DA LOJA: opcional.'],
+          ['• As lojas entram na sua carteira. CNPJ ou DN que já existem no sistema não são alterados.']
+        ]);
+        inst['!cols'] = [{ wch: 95 }];
+        XLSX.utils.book_append_sheet(wb, inst, 'Instruções');
+        XLSX.writeFile(wb, 'modelo-cadastro-lojas.xlsx');
+      }
+      if (window.XLSX) return gerar();
+      var original = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Preparando...';
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload  = function(){ btn.disabled = false; btn.innerHTML = original; gerar(); };
+      s.onerror = function(){ btn.disabled = false; btn.innerHTML = original; alert('Não foi possível gerar a planilha. Verifique a internet e tente de novo.'); };
+      document.head.appendChild(s);
+    }
+
     function copiarCnpj(cnpj, btn) {
       navigator.clipboard.writeText(cnpj).then(function() {
         var icon = btn.querySelector('i');
@@ -2433,6 +2617,49 @@
     }
 
   </script>
+  <!-- ===== MODAL CADASTRO DE LOJA (GCM) ===== -->
+  <div id="modalLojaOverlay" class="cad-overlay" onclick="if(event.target===this) fecharCadastroLoja()">
+    <div class="cad-box">
+      <div class="cad-topo">
+        <div class="cad-titulo"><i class="fas fa-store"></i>Cadastrar loja</div>
+        <button class="cad-fechar" onclick="fecharCadastroLoja()" title="Fechar"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="cad-abas">
+        <button id="cadAbaUma" onclick="trocarAbaCadastro('uma')">Uma loja</button>
+        <button id="cadAbaLote" onclick="trocarAbaCadastro('lote')">Em lote (planilha)</button>
+      </div>
+
+      <!-- Uma loja -->
+      <div id="cadPainelUma">
+        <label>CNPJ *</label>
+        <input type="text" id="cadCnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCnpj(this)">
+        <label>Nome da loja *</label>
+        <input type="text" id="cadNome" placeholder="Razão social">
+        <div class="cad-linha">
+          <div><label>DN *</label><input type="text" id="cadDn" placeholder="Ex: 66726" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')"></div>
+          <div><label>Senha provisória *</label><input type="text" id="cadSenha" placeholder="Mín. 4 caracteres"></div>
+        </div>
+        <label>E-mail da loja</label>
+        <input type="text" id="cadEmail" placeholder="opcional">
+        <p class="cad-dica"><i class="fas fa-info-circle"></i>A loja entra com o CNPJ e a senha provisória, e cria a própria senha no primeiro acesso.</p>
+        <button id="btnCadUma" class="cad-btn" onclick="cadastrarUmaLoja()"><i class="fas fa-check"></i>Cadastrar loja</button>
+      </div>
+
+      <!-- Em lote -->
+      <div id="cadPainelLote" style="display:none;">
+        <div class="cad-passo"><span>1</span>Baixe a planilha modelo e preencha uma loja por linha.</div>
+        <button class="cad-btn claro" onclick="baixarModeloLojas(this)"><i class="fas fa-download"></i>Baixar planilha modelo</button>
+        <div class="cad-passo"><span>2</span>Envie a planilha preenchida.</div>
+        <label class="prod-import-arquivo cad-arquivo">
+          <i class="fas fa-paperclip"></i><span id="cadNomeArquivo">Selecionar planilha</span>
+          <input type="file" id="cadArquivo" accept=".xlsx,.xls" onchange="document.getElementById('cadNomeArquivo').innerText=this.files[0].name">
+        </label>
+        <button id="btnCadLote" class="cad-btn" onclick="cadastrarLojasLote()"><i class="fas fa-upload"></i>Cadastrar lojas</button>
+        <div id="cadResultado"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL ENVIO MANUAL ===== -->
   <div id="modalManualOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center;">
     <div id="modalManualBox" style="background:#fff;border-radius:18px;padding:32px 28px 28px;max-width:340px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.25);text-align:center;position:relative;">
