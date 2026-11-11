@@ -178,6 +178,10 @@
     .cfg-alerta { background: #fff8f0; border: 1px solid #f5c9a0; color: #9a4a00; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.45; display: flex; gap: 8px; }
     .cfg-alerta i { margin-top: 2px; }
     #btnMaster:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-nf-gcm { width: auto !important; margin: 0 !important; padding: 6px 12px !important; border-radius: 20px; background: #38b26e !important; color: #fff !important; font-size: 11px !important; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; }
+    .btn-nf-gcm:hover { background: #2f9a5e !important; }
+    .nf-gcm-loja { background: #f1f4f9; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #1a2d4a; margin-bottom: 4px; }
+    .nf-gcm-select { width: 100%; padding: 9px 10px; border: 1.5px solid #d0d7e4; border-radius: 8px; font-size: 13px; background: #fff; margin: 0; }
     .cad-ok { background: #e8faf0; border: 1px solid #a8dfc0; color: #1a7a4a; border-radius: 8px; padding: 8px 12px; }
     .cad-erros { background: #fff8f0; border: 1px solid #f5c9a0; color: #9a4a00; border-radius: 8px; padding: 8px 12px; margin-top: 8px; max-height: 160px; overflow-y: auto; }
     .cad-erros div { padding: 2px 0; }
@@ -1960,6 +1964,7 @@
           prodItems.push(p);
         }
       });
+      _prodGcm = { itens: prodItems, email: res.email };
       if (prodItems.length > 0) {
         var envManualMap = res.enviosManualMap || {};
         var totalContratos = prodItems.reduce(function(s,p){ return s + p.contratos; }, 0);
@@ -2060,6 +2065,11 @@
           html += '<span style="font-weight:800;font-size:14px;color:' + cardContratoColor + ';background:' + cardContratoBg + ';border-radius:20px;padding:2px 12px;white-space:nowrap;">';
           html += p.contratos + (p.contratos === 1 ? ' contrato' : ' contratos');
           html += '</span>';
+          // GCM envia a NF manual da loja direto daqui
+          if (res.tipo === 'gcm') {
+            html += '<button class="btn-nf-gcm" onclick="abrirEnvioNfGcm(\'' + p.dn + '\')" title="Enviar NF desta loja">'
+                  + '<i class="fas fa-paper-plane"></i>' + (isManual ? 'Reenviar NF' : 'Enviar NF') + '</button>';
+          }
           html += '</div>';  // linha principal
 
           // ── Linha de pagamentos (se houver) ──
@@ -2539,6 +2549,80 @@
     // ==========================================
     // ==========================================
     // ==========================================
+    // ENVIO DE NF PELO GCM (mesmo envio manual da loja, a partir do card de produção)
+    // ==========================================
+    var _prodGcm = { itens: [], email: '' };
+    var _nfGcmLoja = null;
+    var MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    function abrirEnvioNfGcm(dn) {
+      _nfGcmLoja = null;
+      _prodGcm.itens.forEach(function(p) { if (p.dn === dn) _nfGcmLoja = p; });
+      if (!_nfGcmLoja) return;
+      var p = _nfGcmLoja;
+      document.getElementById('nfGcmLoja').innerHTML = '<strong>DN ' + p.dn + '</strong>' + (p.nomeLoja ? ' · ' + p.nomeLoja.replace(/</g, '&lt;') : '');
+
+      // mês/ano já vêm com o mês da produção (ex: 202610 -> Outubro / 2026)
+      var selMes = document.getElementById('nfGcmMes'), selAno = document.getElementById('nfGcmAno');
+      if (!selMes.options.length) {
+        MESES_NOMES.forEach(function(n, i) { selMes.add(new Option(n, ('0' + (i + 1)).slice(-2))); });
+        var anoAtual = new Date().getFullYear();
+        for (var a = anoAtual - 2; a <= anoAtual + 1; a++) selAno.add(new Option(a, a));
+      }
+      var am = (p.anomes || '').toString();
+      if (am.length === 6) { selMes.value = am.slice(4, 6); selAno.value = am.slice(0, 4); }
+
+      document.getElementById('nfGcmNumero').value = '';
+      document.getElementById('nfGcmPdf').value = '';
+      document.getElementById('nfGcmNomeArquivo').innerText = 'Clique ou arraste o PDF';
+      document.getElementById('modalNfGcmOverlay').classList.add('aberto');
+      document.getElementById('nfGcmNumero').focus();
+    }
+
+    function fecharEnvioNfGcm() {
+      document.getElementById('modalNfGcmOverlay').classList.remove('aberto');
+    }
+
+    function enviarNfGcm() {
+      var p = _nfGcmLoja;
+      var numNF = document.getElementById('nfGcmNumero').value.trim();
+      var file  = document.getElementById('nfGcmPdf').files[0];
+      var mes   = document.getElementById('nfGcmMes').value;
+      var ano   = document.getElementById('nfGcmAno').value;
+      if (!numNF) return alert('Preencha o número da NF!');
+      if (!file)  return alert('Selecione o PDF da NF!');
+      if (file.type && file.type !== 'application/pdf') return alert('O arquivo precisa ser PDF.');
+
+      var btn = document.getElementById('btnNfGcm');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Enviando...';
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        chamarFuncao('painel-loja', {
+          action: 'upload', dn: p.dn, nome: p.nomeLoja || ('DN ' + p.dn), emailGCM: _prodGcm.email,
+          numeroNF: numNF, tipo: 'MANUAL', anoMes: ano + mes,
+          fileData: { data: e.target.result, name: file.name, type: file.type }
+        }).then(function() {
+          fecharEnvioNfGcm();
+          // mesmo aviso de sucesso do envio manual da loja
+          var hoje = new Date();
+          var dataFmt = ('0' + hoje.getDate()).slice(-2) + '/' + ('0' + (hoje.getMonth() + 1)).slice(-2) + '/' + hoje.getFullYear();
+          document.getElementById('modalManualTextoBanner').innerHTML =
+            '<span style="display:inline-flex;align-items:center;gap:6px;background:#fffbe6;color:#7a5a00;border:1.5px solid #f0c040;border-radius:8px;font-size:12px;font-weight:700;padding:6px 14px;">'
+            + '<i class="fas fa-pencil-alt" style="color:#c9a800;"></i>DN ' + p.dn + ' — Enviada ' + dataFmt + ' — NF ' + numNF.replace(/</g, '&lt;') + '</span>';
+          document.getElementById('modalManualConfirm').style.display = 'none';
+          document.getElementById('modalManualSucesso').style.display  = '';
+          document.getElementById('modalManualOverlay').style.display  = 'flex';
+          recarregarPainelGestao();
+        }, function(err) {
+          alert('Erro ao enviar: ' + (err.message || err));
+        }).then(function() {
+          btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i>Enviar NF';
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ==========================================
     // CADASTRO DE LOJA PELO GCM (uma loja ou planilha em lote)
     // ==========================================
     function abrirCadastroLoja(aba) {
@@ -2841,6 +2925,31 @@
     }
 
   </script>
+  <!-- ===== MODAL ENVIO DE NF PELO GCM ===== -->
+  <div id="modalNfGcmOverlay" class="cad-overlay" onclick="if(event.target===this) fecharEnvioNfGcm()">
+    <div class="cad-box">
+      <div class="cad-topo">
+        <div class="cad-titulo"><i class="fas fa-upload"></i>Envio de NF</div>
+        <button class="cad-fechar" onclick="fecharEnvioNfGcm()" title="Fechar"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="nfGcmLoja" class="nf-gcm-loja"></div>
+      <div class="cad-linha">
+        <div><label>Mês</label><select id="nfGcmMes" class="nf-gcm-select"></select></div>
+        <div><label>Ano</label><select id="nfGcmAno" class="nf-gcm-select"></select></div>
+      </div>
+      <label>Número da NF *</label>
+      <input type="text" id="nfGcmNumero" placeholder="Número da NF">
+      <div class="dropzone" style="position:relative;margin-top:12px;">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <p><strong>Upload</strong> do PDF</p>
+        <span id="nfGcmNomeArquivo">Clique ou arraste o PDF</span>
+        <input type="file" id="nfGcmPdf" accept="application/pdf"
+          onchange="document.getElementById('nfGcmNomeArquivo').innerText=this.files[0].name">
+      </div>
+      <button id="btnNfGcm" class="cad-btn" style="background:#38b26e !important;" onclick="enviarNfGcm()"><i class="fas fa-paper-plane"></i>Enviar NF</button>
+    </div>
+  </div>
+
   <!-- ===== MODAL CONFIRMAR CONFIGURAÇÕES (ADMIN) ===== -->
   <div id="modalConfigOverlay" class="cad-overlay" onclick="if(event.target===this) fecharConfirmConfig()">
     <div class="cad-box" style="max-width:400px;">
