@@ -180,6 +180,8 @@
     #btnMaster:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-nf-gcm { width: auto !important; margin: 0 !important; padding: 6px 12px !important; border-radius: 20px; background: #38b26e !important; color: #fff !important; font-size: 11px !important; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; }
     .btn-nf-gcm:hover { background: #2f9a5e !important; }
+    tr.pend-enviada, tr.pend-enviada td { background: #fffbe6 !important; }
+    .badge-status.pend-nf { background: #f0c040; color: #7a5a00; border: 1px solid #e0b030; }
     .nf-gcm-loja { background: #f1f4f9; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #1a2d4a; margin-bottom: 4px; }
     .nf-gcm-select { width: 100%; padding: 9px 10px; border: 1.5px solid #d0d7e4; border-radius: 8px; font-size: 13px; background: #fff; margin: 0; }
     .cad-ok { background: #e8faf0; border: 1px solid #a8dfc0; color: #1a7a4a; border-radius: 8px; padding: 8px 12px; }
@@ -2196,7 +2198,8 @@
                   envMeta = l.dataHoraCom ? l.dataHoraCom + dHtml(l.diasCom) : '';
                 }
               }
-              html += '<tr class="loja-card-row">';
+              if (!isEnv && res.tipo === 'gcm') envMeta = botaoPendenteGcm(l, 'COMISSAO');
+              html += '<tr class="loja-card-row" id="' + idPendenteGcm(l.dn, l.anomes, 'COMISSAO') + '">';
               html += '<td class="col-status">' + stHtml(l.statusCom) + '</td>';
               html += '<td class="col-mes">'  + l.mesLabel + '</td>';
               html += '<td class="col-tipo">Retorno + Plus</td>';
@@ -2220,7 +2223,8 @@
                   envMetaB = l.dataHoraBon ? l.dataHoraBon + dHtml(l.diasBon) : '';
                 }
               }
-              html += '<tr class="loja-card-row">';
+              if (!isEnvB && res.tipo === 'gcm') envMetaB = botaoPendenteGcm(l, 'BONUS');
+              html += '<tr class="loja-card-row" id="' + idPendenteGcm(l.dn, l.anomes, 'BONUS') + '">';
               html += '<td class="col-status">' + stHtml(l.statusBon) + '</td>';
               html += '<td class="col-mes">'   + l.mesLabel + '</td>';
               html += '<td class="col-tipo">Bônus</td>';
@@ -2241,15 +2245,7 @@
             }
           });
 
-          // Linhas de pagamento (verde) no final
-          pags.forEach(function(pag) {
-            html += '<tr class="loja-card-pag-row">';
-            html += '<td class="col-status" style="padding-left:14px"><span class="pag-dn-badge">DN ' + pag.dn + '</span></td>';
-            html += '<td class="pag-col-data" colspan="2"><i class="fas fa-calendar-check" style="margin-right:5px;color:#4a7a5a"></i>' + pag.dataPagto + '</td>';
-            html += '<td></td>';
-            html += '<td class="pag-col-valor">' + formatarValor(pag.valor) + '</td>';
-            html += '</tr>';
-          });
+          // (pagamentos não aparecem mais aqui: só a pendência. Eles continuam na Produção do Período.)
 
           html += '</tbody></table>';
           html += '</div>'; // loja-card
@@ -2555,28 +2551,84 @@
     var _nfGcmLoja = null;
     var MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-    function abrirEnvioNfGcm(dn) {
-      _nfGcmLoja = null;
-      _prodGcm.itens.forEach(function(p) { if (p.dn === dn) _nfGcmLoja = p; });
-      if (!_nfGcmLoja) return;
-      var p = _nfGcmLoja;
-      document.getElementById('nfGcmLoja').innerHTML = '<strong>DN ' + p.dn + '</strong>' + (p.nomeLoja ? ' · ' + p.nomeLoja.replace(/</g, '&lt;') : '');
+    // A mesma janela serve para dois envios:
+    //  - card de produção: envio manual (tipo MANUAL), mês/ano escolhíveis -> abrirEnvioNfGcm
+    //  - nota pendente: NF de Retorno+Plus ou Bônus daquele mês (mês/ano travados) -> abrirEnvioPendenteGcm
+    // _nfGcmLoja guarda o destino: { dn, nomeLoja, anomes, tipo, fixo, marcar(estado) }
+    function abrirJanelaNfGcm(destino, titulo) {
+      _nfGcmLoja = destino;
+      document.getElementById('nfGcmLoja').innerHTML = titulo;
 
-      // mês/ano já vêm com o mês da produção (ex: 202610 -> Outubro / 2026)
       var selMes = document.getElementById('nfGcmMes'), selAno = document.getElementById('nfGcmAno');
       if (!selMes.options.length) {
         MESES_NOMES.forEach(function(n, i) { selMes.add(new Option(n, ('0' + (i + 1)).slice(-2))); });
         var anoAtual = new Date().getFullYear();
         for (var a = anoAtual - 2; a <= anoAtual + 1; a++) selAno.add(new Option(a, a));
       }
-      var am = (p.anomes || '').toString();
-      if (am.length === 6) { selMes.value = am.slice(4, 6); selAno.value = am.slice(0, 4); }
+      var am = (destino.anomes || '').toString();
+      if (am.length === 6) {
+        if (![].some.call(selAno.options, function(o) { return o.value === am.slice(0, 4); })) selAno.add(new Option(am.slice(0, 4), am.slice(0, 4)));
+        selMes.value = am.slice(4, 6); selAno.value = am.slice(0, 4);
+      }
+      selMes.disabled = selAno.disabled = !!destino.fixo;
 
       document.getElementById('nfGcmNumero').value = '';
       document.getElementById('nfGcmPdf').value = '';
       document.getElementById('nfGcmNomeArquivo').innerText = 'Clique ou arraste o PDF';
       document.getElementById('modalNfGcmOverlay').classList.add('aberto');
       document.getElementById('nfGcmNumero').focus();
+    }
+
+    function abrirEnvioNfGcm(dn) {
+      var p = null;
+      _prodGcm.itens.forEach(function(i) { if (i.dn === dn) p = i; });
+      if (!p) return;
+      abrirJanelaNfGcm(
+        { dn: p.dn, nomeLoja: p.nomeLoja, anomes: p.anomes, tipo: 'MANUAL', fixo: false,
+          marcar: function(estado) { marcarCardNfEnviada(p.dn, estado); } },
+        '<strong>DN ' + p.dn + '</strong>' + (p.nomeLoja ? ' · ' + p.nomeLoja.replace(/</g, '&lt;') : ''));
+    }
+
+    // ── Notas pendentes: botão "Enviar NF" em cada linha pendente do card da loja ──
+    var _pendGcm = {};
+    function idPendenteGcm(dn, anomes, tipo) { return 'pend-' + dn + '-' + anomes + '-' + tipo; }
+
+    function botaoPendenteGcm(l, tipo) {
+      var id = idPendenteGcm(l.dn, l.anomes, tipo);
+      _pendGcm[id] = { dn: l.dn, nomeLoja: l.nome, anomes: l.anomes, mesLabel: l.mesLabel, tipo: tipo,
+                       valor: tipo === 'BONUS' ? l.bonus : l.comissao };
+      return '<button class="btn-nf-gcm" onclick="abrirEnvioPendenteGcm(\'' + id + '\')" title="Enviar a NF desta pendência">'
+           + '<i class="fas fa-paper-plane"></i>Enviar NF</button>';
+    }
+
+    function abrirEnvioPendenteGcm(id) {
+      var d = _pendGcm[id];
+      if (!d) return;
+      var tipoLabel = d.tipo === 'BONUS' ? 'Bônus' : 'Retorno + Plus';
+      abrirJanelaNfGcm(
+        { dn: d.dn, nomeLoja: d.nomeLoja, anomes: d.anomes, tipo: d.tipo, fixo: true,
+          marcar: function(estado) { marcarLinhaPendenteGcm(id, estado); } },
+        '<strong>DN ' + d.dn + '</strong>' + (d.nomeLoja ? ' · ' + d.nomeLoja.replace(/</g, '&lt;') : '')
+        + '<div style="margin-top:4px;font-size:12px;color:#4a5568;">' + tipoLabel + ' · ' + d.mesLabel
+        + ' · <strong>' + formatarValor(d.valor) + '</strong></div>');
+    }
+
+    // Linha pendente: 'enviando' / 'ok' (amarela, "NF Enviada") / 'erro' (volta como estava)
+    function marcarLinhaPendenteGcm(id, estado) {
+      var tr = document.getElementById(id);
+      if (!tr) return;
+      if (tr.dataset.htmlOriginal === undefined) tr.dataset.htmlOriginal = tr.innerHTML;
+      if (estado === 'erro') {
+        tr.innerHTML = tr.dataset.htmlOriginal;
+        tr.classList.remove('pend-enviada');
+        return;
+      }
+      tr.classList.add('pend-enviada');
+      tr.querySelector('.col-status').innerHTML = estado === 'enviando'
+        ? '<span class="badge-status pend-nf"><i class="fas fa-spinner fa-spin"></i> Enviando</span>'
+        : '<span class="badge-status pend-nf"><i class="fas fa-check"></i> NF Enviada</span>';
+      var envio = tr.querySelector('.col-envio');
+      if (envio) envio.innerHTML = '';
     }
 
     // Destaca o card da loja no painel do GCM: 'enviando' / 'ok' (amarelo, "NF Enviada") / 'erro' (volta ao normal)
@@ -2620,12 +2672,12 @@
 
       var btn = document.getElementById('btnNfGcm');
       btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Enviando...';
-      marcarCardNfEnviada(p.dn, 'enviando'); // destaca o card na hora, sem esperar o servidor
+      p.marcar('enviando'); // destaca na hora, sem esperar o servidor
       var reader = new FileReader();
       reader.onload = function(e) {
         chamarFuncao('painel-loja', {
           action: 'upload', dn: p.dn, nome: p.nomeLoja || ('DN ' + p.dn), emailGCM: _prodGcm.email,
-          numeroNF: numNF, tipo: 'MANUAL', anoMes: ano + mes,
+          numeroNF: numNF, tipo: p.tipo, anoMes: p.fixo ? p.anomes : ano + mes,
           fileData: { data: e.target.result, name: file.name, type: file.type }
         }).then(function() {
           fecharEnvioNfGcm();
@@ -2638,17 +2690,17 @@
           document.getElementById('modalManualConfirm').style.display = 'none';
           document.getElementById('modalManualSucesso').style.display  = '';
           document.getElementById('modalManualOverlay').style.display  = 'flex';
-          marcarCardNfEnviada(p.dn, 'ok');
+          p.marcar('ok');
         }, function(err) {
           console.error('Envio de NF:', err);
           var msg = String(err.message || err);
           if (msg.indexOf('e-mail foi enviado') >= 0) {
-            // e-mail saiu; só o registro no sistema falhou: o card continua destacado
-            marcarCardNfEnviada(p.dn, 'ok');
+            // e-mail saiu; só o registro no sistema falhou: continua destacado
+            p.marcar('ok');
             fecharEnvioNfGcm();
             alert('A NF foi enviada por e-mail, mas o sistema não conseguiu registrar o envio.\nAvise o administrador.');
           } else {
-            marcarCardNfEnviada(p.dn, 'erro');
+            p.marcar('erro');
             alert('Não foi possível enviar a NF. Confira a internet e tente de novo.\nSe continuar, avise o administrador.');
           }
         }).then(function() {
