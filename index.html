@@ -803,6 +803,9 @@
         <p style="font-size:13px;color:#718096;margin-top:0;margin-bottom:14px;">
           Col <strong>A</strong>=CNPJ | Col <strong>D</strong>=Tipo (Bônus / Retorno+Plus) | Col <strong>E</strong>=ANOMES (ex: 202512) | Col <strong>F</strong>=Valor
         </p>
+        <button onclick="baixarModeloPendentes(this)" style="background:#fff;color:#e67e22;border:1.5px dashed #f5c9a0;margin:0 0 12px;font-size:13px;">
+          <i class="fas fa-download" style="margin-right:6px"></i>Baixar planilha modelo
+        </button>
         <div class="dropzone dropzone-small" style="padding:15px;position:relative;">
           <i class="fas fa-file-excel" style="font-size:20px;display:block;margin-bottom:6px;color:#e67e22"></i>
           <span id="nomeComissoes">Clique para selecionar o arquivo .xlsx</span>
@@ -1721,6 +1724,40 @@
         alert('Erro: ' + (err.message || err));
       }).then(function() {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i>Confirmar';
+      });
+    }
+
+    // ==========================================
+    // ADMIN: PLANILHA MODELO DE NOTAS PENDENTES
+    // A importação lê A=CNPJ, D=Tipo, E=ANOMES, F=Valor (B e C são ignoradas: só para conferência)
+    // ==========================================
+    function baixarModeloPendentes(btn) {
+      var original = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Preparando...';
+      carregarSheetJS().then(function() {
+        var wb = XLSX.utils.book_new();
+        var ws = XLSX.utils.aoa_to_sheet([['CNPJ', 'NOME DA LOJA', 'DN', 'TIPO', 'ANOMES', 'VALOR']]);
+        ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 14 }];
+        XLSX.utils.book_append_sheet(wb, ws, 'Pendentes');
+        var inst = XLSX.utils.aoa_to_sheet([
+          ['Como preencher'],
+          ['• Uma nota pendente por linha, a partir da linha 2 da aba "Pendentes". Não mude a ordem das colunas.'],
+          ['• A - CNPJ: obrigatório, com ou sem pontos (ex: 05.331.398/0001-62 ou 05331398000162). A loja precisa estar cadastrada.'],
+          ['• B - NOME DA LOJA e C - DN: opcionais, só para você conferir (o sistema não lê).'],
+          ['• D - TIPO: escreva "Retorno+Plus" ou "Bônus".'],
+          ['• E - ANOMES: ano e mês juntos, 6 números (ex: 202610 = Outubro/2026).'],
+          ['• F - VALOR: só o número (ex: 11195,87).'],
+          ['• A importação SUBSTITUI todas as notas pendentes atuais.'],
+          [''],
+          ['Exemplo de linha:', '05.331.398/0001-62 | GILMODESTO VEICULOS LTDA | 66726 | Retorno+Plus | 202610 | 11195,87']
+        ]);
+        inst['!cols'] = [{ wch: 100 }, { wch: 90 }];
+        XLSX.utils.book_append_sheet(wb, inst, 'Instruções');
+        XLSX.writeFile(wb, 'modelo-notas-pendentes.xlsx');
+      }).catch(function(err) {
+        alert(err.message || err);
+      }).then(function() {
+        btn.disabled = false; btn.innerHTML = original;
       });
     }
 
