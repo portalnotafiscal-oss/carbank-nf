@@ -181,6 +181,20 @@
     .btn-nf-gcm { width: auto !important; margin: 0 !important; padding: 6px 12px !important; border-radius: 20px; background: #38b26e !important; color: #fff !important; font-size: 11px !important; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; }
     .btn-nf-gcm:hover { background: #2f9a5e !important; }
     tr.pend-enviada, tr.pend-enviada td { background: #fffbe6 !important; }
+    .ml-total { font-size: 11px; font-weight: 700; background: #e8eef8; color: #0d2d66; border-radius: 20px; padding: 2px 9px; }
+    .ml-lista { margin-top: 12px; max-height: 55vh; overflow-y: auto; }
+    .ml-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 6px; }
+    .ml-info { flex: 1; min-width: 0; }
+    .ml-nome { font-size: 13px; font-weight: 600; color: #1a2d4a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ml-sub { font-size: 11px; color: #718096; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .ml-selo { font-size: 10px; font-weight: 700; border-radius: 20px; padding: 1px 7px; background: #fff3e0; color: #c05621; }
+    .ml-acao { width: 32px !important; height: 32px; margin: 0 !important; padding: 0 !important; border-radius: 8px; background: #f1f4f9 !important; color: #4a5568 !important; font-size: 13px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .ml-acao:hover { background: #e2e8f0 !important; }
+    .ml-acao.excluir { color: #c0392b !important; }
+    .ml-acao.excluir:hover { background: #fde8e6 !important; }
+    .ml-vazio { text-align: center; padding: 24px; color: #a0aec0; font-size: 13px; font-style: italic; }
+    .ml-check { display: flex !important; align-items: center; gap: 8px; margin-top: 14px !important; cursor: pointer; font-weight: 600; }
+    .ml-check input { width: auto; margin: 0; }
     .badge-status.pend-nf { background: #f0c040; color: #7a5a00; border: 1px solid #e0b030; }
     .nf-gcm-loja { background: #f1f4f9; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #1a2d4a; margin-bottom: 4px; }
     .nf-gcm-select { width: 100%; padding: 9px 10px; border: 1.5px solid #d0d7e4; border-radius: 8px; font-size: 13px; background: #fff; margin: 0; }
@@ -1908,6 +1922,7 @@
         html += '<div class="prod-import-bar lojas">';
         html += '<span class="prod-import-titulo"><i class="fas fa-store"></i>Lojas</span>';
         html += '<div class="gcm-card-acoes">';
+        html += '<button onclick="abrirMinhasLojas()" class="prod-import-btn secundario"><i class="fas fa-list"></i>Minhas lojas</button>';
         html += '<button onclick="abrirCadastroLoja(\'uma\')" class="prod-import-btn"><i class="fas fa-plus"></i>Nova loja</button>';
         html += '</div>';
         html += '</div>';
@@ -2748,6 +2763,132 @@
     }
 
     // ==========================================
+    // MINHAS LOJAS (GCM): listar, editar, excluir
+    // ==========================================
+    var _minhasLojas = [], _lojaEditando = null, _lojasAlteradas = false;
+
+    function chamarGcm(action, extra) {
+      return chamarFuncao('painel-gestao', Object.assign({ action: action, email: _sessao.usuario, senha: _sessao.senha }, extra || {}));
+    }
+
+    function abrirMinhasLojas() {
+      _lojasAlteradas = false;
+      document.getElementById('mlBusca').value = '';
+      voltarListaLojas();
+      document.getElementById('mlLista').innerHTML = '<div class="ml-vazio"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
+      document.getElementById('mlTotal').innerText = '';
+      document.getElementById('modalMinhasLojasOverlay').classList.add('aberto');
+      carregarMinhasLojas();
+    }
+
+    function carregarMinhasLojas() {
+      return chamarGcm('lojas-listar').then(function(r) {
+        _minhasLojas = r.lojas || [];
+        renderizarMinhasLojas();
+      }, function(err) {
+        document.getElementById('mlLista').innerHTML = '<div class="ml-vazio">Não foi possível carregar as lojas: ' + (err.message || err) + '</div>';
+      });
+    }
+
+    // fecha e, se algo mudou, atualiza o painel
+    function fecharMinhasLojas() {
+      document.getElementById('modalMinhasLojasOverlay').classList.remove('aberto');
+      if (_lojasAlteradas) recarregarPainelGestao();
+    }
+
+    function formatarCnpj(c) {
+      c = (c || '').replace(/\D/g, '');
+      return c.length === 14 ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : c;
+    }
+
+    function renderizarMinhasLojas() {
+      var esc = function(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) { return '&#' + ch.charCodeAt(0) + ';'; }); };
+      var busca = document.getElementById('mlBusca').value.trim().toLowerCase();
+      var buscaNum = busca.replace(/\D/g, '');
+      var lista = _minhasLojas.filter(function(l) {
+        if (!busca) return true;
+        return l.nome.toLowerCase().indexOf(busca) >= 0 || (buscaNum && (l.dn.indexOf(buscaNum) >= 0 || l.cnpj.indexOf(buscaNum) >= 0));
+      });
+      document.getElementById('mlTotal').innerText = _minhasLojas.length;
+      if (!_minhasLojas.length) { document.getElementById('mlLista').innerHTML = '<div class="ml-vazio">Você ainda não tem lojas cadastradas.</div>'; return; }
+      if (!lista.length) { document.getElementById('mlLista').innerHTML = '<div class="ml-vazio">Nenhuma loja encontrada.</div>'; return; }
+      document.getElementById('mlLista').innerHTML = lista.map(function(l) {
+        return '<div class="ml-item">'
+          + '<div class="ml-info"><div class="ml-nome" title="' + esc(l.nome) + '">' + esc(l.nome) + '</div>'
+          + '<div class="ml-sub"><span><strong>DN ' + esc(l.dn) + '</strong></span><span>CNPJ ' + formatarCnpj(l.cnpj) + '</span>'
+          + (l.primeiroAcesso ? '<span class="ml-selo" title="A loja ainda não criou a própria senha">1º acesso pendente</span>' : '')
+          + '</div></div>'
+          + '<button class="ml-acao" title="Editar" onclick="editarLoja(\'' + l.cnpj + '\')"><i class="fas fa-pen"></i></button>'
+          + '<button class="ml-acao excluir" title="Excluir" onclick="excluirLoja(\'' + l.cnpj + '\', this)"><i class="fas fa-trash-alt"></i></button>'
+          + '</div>';
+      }).join('');
+    }
+
+    function voltarListaLojas() {
+      _lojaEditando = null;
+      document.getElementById('mlPainelLista').style.display = '';
+      document.getElementById('mlPainelEditar').style.display = 'none';
+    }
+
+    function editarLoja(cnpj) {
+      var l = null;
+      _minhasLojas.forEach(function(x) { if (x.cnpj === cnpj) l = x; });
+      if (!l) return;
+      _lojaEditando = l;
+      document.getElementById('mlCnpj').value = formatarCnpj(l.cnpj);
+      document.getElementById('mlNome').value = l.nome;
+      document.getElementById('mlDn').value = l.dn;
+      document.getElementById('mlTrocarSenha').checked = false;
+      document.getElementById('mlBlocoSenha').style.display = 'none';
+      document.getElementById('mlSenha').value = gerarSenhaProvisoria();
+      document.getElementById('mlPainelLista').style.display = 'none';
+      document.getElementById('mlPainelEditar').style.display = '';
+      document.getElementById('mlNome').focus();
+    }
+
+    function salvarEdicaoLoja() {
+      var l = _lojaEditando;
+      if (!l) return;
+      var nome = document.getElementById('mlNome').value.trim();
+      var dn = document.getElementById('mlDn').value.trim();
+      var trocar = document.getElementById('mlTrocarSenha').checked;
+      var senha = document.getElementById('mlSenha').value.trim();
+      if (!nome) return alert('Informe o nome da loja.');
+      if (!dn) return alert('Informe o DN.');
+      if (trocar && senha.length < 4) return alert('A senha provisória precisa ter pelo menos 4 caracteres.');
+      if (dn !== l.dn && !confirm('Trocar o DN de ' + l.dn + ' para ' + dn + '?\n\nNotas pendentes e produção já importadas continuam ligadas ao DN antigo.')) return;
+
+      var btn = document.getElementById('btnMlSalvar');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>Salvando...';
+      chamarGcm('loja-editar', { cnpj: l.cnpj, nome: nome, dn: dn, novaSenhaProvisoria: trocar ? senha : '' }).then(function() {
+        _lojasAlteradas = true;
+        if (trocar) alert('Loja atualizada!\n\nPasse para a loja:\nUsuário (CNPJ): ' + formatarCnpj(l.cnpj) + '\nSenha provisória: ' + senha);
+        voltarListaLojas();
+        return carregarMinhasLojas();
+      }, function(err) {
+        alert(err.message || err);
+      }).then(function() {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i>Salvar';
+      });
+    }
+
+    function excluirLoja(cnpj, botao) {
+      var l = null;
+      _minhasLojas.forEach(function(x) { if (x.cnpj === cnpj) l = x; });
+      if (!l) return;
+      if (!confirm('Excluir a loja ' + l.nome + ' (DN ' + l.dn + ')?\n\nEla não vai mais conseguir entrar no sistema. Essa ação não pode ser desfeita.')) return;
+      botao.disabled = true; botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      chamarGcm('loja-excluir', { cnpj: cnpj }).then(function() {
+        _lojasAlteradas = true;
+        _minhasLojas = _minhasLojas.filter(function(x) { return x.cnpj !== cnpj; });
+        renderizarMinhasLojas();
+      }, function(err) {
+        alert(err.message || err);
+        botao.disabled = false; botao.innerHTML = '<i class="fas fa-trash-alt"></i>';
+      });
+    }
+
+    // ==========================================
     // CADASTRO DE LOJA PELO GCM (uma loja ou planilha em lote)
     // ==========================================
     function abrirCadastroLoja(aba) {
@@ -3050,6 +3191,45 @@
     }
 
   </script>
+  <!-- ===== MODAL MINHAS LOJAS (GCM) ===== -->
+  <div id="modalMinhasLojasOverlay" class="cad-overlay" onclick="if(event.target===this) fecharMinhasLojas()">
+    <div class="cad-box" style="max-width:560px;">
+      <div class="cad-topo">
+        <div class="cad-titulo"><i class="fas fa-store"></i>Minhas lojas <span id="mlTotal" class="ml-total"></span></div>
+        <button class="cad-fechar" onclick="fecharMinhasLojas()" title="Fechar"><i class="fas fa-times"></i></button>
+      </div>
+
+      <!-- Lista -->
+      <div id="mlPainelLista">
+        <div style="position:relative;">
+          <i class="fas fa-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#a0aec0;font-size:12px;"></i>
+          <input type="text" id="mlBusca" placeholder="Buscar por nome, DN ou CNPJ" oninput="renderizarMinhasLojas()" style="padding-left:30px !important;">
+        </div>
+        <div id="mlLista" class="ml-lista"></div>
+      </div>
+
+      <!-- Edição -->
+      <div id="mlPainelEditar" style="display:none;">
+        <label>CNPJ (usuário da loja)</label>
+        <input type="text" id="mlCnpj" disabled style="background:#f1f4f9;color:#718096;">
+        <label>Nome da loja *</label>
+        <input type="text" id="mlNome">
+        <label>DN *</label>
+        <input type="text" id="mlDn" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+        <p class="cad-dica"><i class="fas fa-info-circle"></i>Notas e produção já importadas ficam ligadas ao DN antigo.</p>
+        <label class="ml-check"><input type="checkbox" id="mlTrocarSenha" onchange="document.getElementById('mlBlocoSenha').style.display=this.checked?'':'none'"> Gerar nova senha provisória (a loja esqueceu a senha)</label>
+        <div id="mlBlocoSenha" style="display:none;">
+          <input type="text" id="mlSenha" placeholder="Mín. 4 caracteres">
+          <p class="cad-dica"><i class="fas fa-info-circle"></i>A loja entra com essa senha e cria uma nova no próximo acesso.</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="cad-btn claro" onclick="voltarListaLojas()" style="margin-top:14px !important;">Voltar</button>
+          <button id="btnMlSalvar" class="cad-btn" onclick="salvarEdicaoLoja()"><i class="fas fa-check"></i>Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL ENVIO DE NF PELO GCM ===== -->
   <div id="modalNfGcmOverlay" class="cad-overlay" onclick="if(event.target===this) fecharEnvioNfGcm()">
     <div class="cad-box">
